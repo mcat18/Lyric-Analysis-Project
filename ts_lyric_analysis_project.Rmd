@@ -1,0 +1,2316 @@
+---
+title: Lyric Analysis 
+toc-title: "Table of Contents"
+output:
+  html_document:
+      #css: ../HTML/style.css
+      toc: TRUE
+      includes: 
+        #before_body: ../HTML/header.html
+          
+---
+
+
+
+
+<style>
+.nav>li>a {
+    position: relative;
+    display: block;
+    padding: 10px 15px;
+    color: #000000;
+}
+.nav-pills>li.active>a, .nav-pills>li.active>a:hover, .nav-pills>li.active>a:focus {
+    color: #FFFFFF;
+    background-color: #aec0fc;
+}
+
+
+</style>
+
+<style>
+a:link {
+    color: black;
+}
+
+a:visited {
+    color: black;
+}
+
+ a:hover {
+    color: 	#dfb0df;
+}
+
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo=FALSE,message=FALSE,results = 'hide', warning=FALSE}
+source(here::here('R Scripts', 'data_cleaning_prep.R'))
+```
+
+
+# Taylor Swift (Self-titled Album) {.tabset .tabset-fade .tabset-pills}
+
+
+## Top 10 Words 
+
+
+
+```{r,echo=FALSE,message=FALSE}
+top_10_debut = tokens %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(n = 10) %>% 
+  filter(word != "smile")
+
+top_10_debut %>%
+  hchart(
+  'bar', hcaes(x = word, y = n), name = "Word Count",color = "#0ca3db")  %>% 
+ # hc_title(text = "Top 10 Words in Taylor Swift (Self-titled Debut Album)") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Counts"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+## Sentiment of Songs
+
+
+```{r,echo=FALSE,message=FALSE, results='hide'}
+sentiment_afinn = tokens %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  group_by(song) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  ungroup() %>% 
+  mutate(method = "afinn")
+
+sentiment_bing = tokens %>% 
+  inner_join(tidytext::get_sentiments("bing"), 
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "bing")
+
+sentiment_nrc = tokens %>% 
+  inner_join(tidytext::get_sentiments("nrc") %>% 
+               filter(sentiment %in% c("positive", 
+                                        "negative")),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+sentiment_nrc_2 = tokens %>% 
+  inner_join(tidytext::get_sentiments("nrc"),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+data_sentiment = bind_rows(sentiment_afinn,
+                           sentiment_bing,
+                           sentiment_nrc) %>% 
+  left_join(debut, by = "song")
+```
+
+
+
+```{r,echo=FALSE,message=FALSE}
+sentiment_bing_2 = 
+  sentiment_bing %>% 
+  arrange(desc(sentiment))
+
+
+sentiment_bing_2 %>%
+  hchart(
+  'bar', hcaes(x = song, y = sentiment), name = "Sentiment",color = "#0ca3db")  %>% 
+  #hc_title(text = "Taylor Swift (Self-titled Debut Album) Songs by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Song")) %>%
+  hc_yAxis(
+    title = list(text = "Sentiment"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+## Most Common Word by Sentiment
+
+```{r,echo=FALSE,message=FALSE}
+tokens %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  dplyr::rename(sentiment = value) %>% 
+  count(word, sentiment) %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, 
+            n = 1) %>%
+   filter(word != "damn") %>% 
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  hchart(
+  'bar', hcaes(x = word, y = n, group = sentiment), tooltip = list(pointFormat = "Count: {point.n} and Sentiment: {point.sentiment}"), pointWidth = 15) %>%  
+ hc_colors(c("#3a2964", "#305274", "#267b84","#409c7d", "#7fb55f", "#bece42", "#fde725" )) %>% 
+ # hc_title(text = "Most Common Words by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Count"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+## Emotion in Songs
+
+
+``````{r,echo=FALSE,message=FALSE}
+lyrics_sentiment_fearless <- get_nrc_sentiment((tokens$word))
+sentimentscores <- data.frame(colSums(lyrics_sentiment_fearless[,]))   
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment" = rownames(sentimentscores), sentimentscores)
+
+
+sentimentscores %>%
+  hchart(
+  'bar', hcaes(x = sentiment, y = Score), name = "Score",color = "#0ca3db")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Emotion and Sentiment")) %>%
+  hc_yAxis(
+    title = list(text = "Score"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+## Most Important Words 
+
+```{r,echo=FALSE,message=FALSE}
+#tf_idf for Taylor Swift 
+
+tswift_tf_idf <- tokens %>%
+  count(song, word, sort = TRUE) %>%
+  bind_tf_idf(word, song, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(song) %>%
+  top_n(5) %>%
+  ungroup
+
+tswift_tf_idf = tswift_tf_idf %>% 
+  arrange(desc(tf_idf))
+
+tswift_tf_idf = tswift_tf_idf[-c(6:96), ]
+
+tswift_tf_idf %>% 
+hchart(
+  'bar', hcaes(x = word, y = round(tf_idf,2)), name = "tf-idf",color = "#0ca3db")  %>% 
+  # hc_title(text = "Songs with the Lowest Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "tf-idf"))  %>% 
+  hc_caption(text = "td-idf measures the most important words in the text.") %>% 
+  hc_add_theme(hc_theme_elementary())
+
+```
+
+
+
+## Topic Analysis 
+
+```{r,echo=FALSE,message=FALSE, results = 'hide'}
+data_topic <- tokens %>%
+  count(song, word, sort = TRUE) %>%
+  cast_dfm(song, word, n)
+
+model = stm(data_topic, K = 14, verbose = FALSE, init.type = "Spectral")
+
+summary(model)
+
+```
+
+
+The topic analysis reflects songs on the album. 
+
+Topic 1 is The Outside, Topic 2 is Perfectly Good Heart, Topic 3 is A Place in This World, Topic 4 is Invisible, Topic 5 is Stay Beautiful, Topic 6 is Should've Said No, Topic 7 is Tied Together with a Smile, Topic 8 is I'm Only Me When I'm With You, Topic 9 is Picture to Burn, Topic 10 is Cold As You, Topic 11 is Teardrops On My Guitar, Topic 12 is Tim McGraw, Topic 13 is Our Song, and Topic 14 is Mary's Song (Oh My My). 
+
+```{r,echo=FALSE,message=FALSE,fig.align = 'center'}
+td_beta <- tidy(model)
+
+td_beta %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  ungroup() %>%
+  dplyr::filter(term != "fore") %>% 
+  mutate(#topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_viridis_d() +
+  #scale_fill_manual(values=c("#983c7f", "#583462", "#be5786", "#b970a5", "#e1b5ca")) +
+  labs(x = NULL, y = expression(beta),
+       title = "Words in Each Topic")
+
+
+```
+
+
+
+
+# {.unlisted .unnumbered}
+
+
+# Fearless {.tabset .tabset-fade .tabset-pills}
+
+
+
+## Top 10 Words
+
+
+```{r,echo=FALSE,message=FALSE}
+top_10_fearless = tokens_fearless %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(n = 10) %>% 
+  filter(word != "fifteen" & word != "night" & word != "town" & word != "waiting")
+
+top_10_fearless %>%
+  hchart(
+  'bar', hcaes(x = word, y = n), name = "Word Count",color = "#f6ed95")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Counts"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+## Sentiment of Songs
+
+```{r,echo=FALSE,message=FALSE, results='hide'}
+sentiment_afinn_fearless = tokens_fearless %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  group_by(song) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  ungroup() %>% 
+  mutate(method = "afinn")
+
+sentiment_bing_fearless = tokens_fearless %>% 
+  inner_join(tidytext::get_sentiments("bing"), 
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "bing")
+
+sentiment_nrc_fearless = tokens_fearless %>% 
+  inner_join(tidytext::get_sentiments("nrc") %>% 
+               filter(sentiment %in% c("positive", 
+                                        "negative")),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+sentiment_nrc_2_fearless = tokens_fearless %>% 
+  inner_join(tidytext::get_sentiments("nrc"),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+data_sentiment_fearless = bind_rows(sentiment_afinn_fearless,
+                           sentiment_bing_fearless,
+                           sentiment_nrc_fearless) %>% 
+  left_join(fearless, by = "song")
+
+```
+
+
+
+
+
+
+
+
+```{r,echo=FALSE,message=FALSE}
+sentiment_bing_fearless_2 = 
+  sentiment_bing_fearless %>% 
+  arrange(desc(sentiment))
+
+
+sentiment_bing_fearless_2 %>%
+  hchart(
+  'bar', hcaes(x = song, y = sentiment), name = "Sentiment",color = "#f6ed95")  %>% 
+ # hc_title(text = "Fearless Songs by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Song")) %>%
+  hc_yAxis(
+    title = list(text = "Sentiment"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+## Most Common Word by Sentiment 
+
+```{r,echo=FALSE,message=FALSE}
+tokens_fearless %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  dplyr::rename(sentiment = value) %>% 
+  count(word, sentiment) %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, 
+            n = 1) %>%
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  hchart(
+  'bar', hcaes(x = word, y = n, group = sentiment), tooltip = list(pointFormat = "Count: {point.n} and Sentiment: {point.sentiment}"),pointWidth = 15) %>%  
+ hc_colors(c( "#3a2964", "#305274", "#267b84","#409c7d", "#7fb55f", "#bece42", "#fde725" )) %>% 
+ # hc_title(text = "Most Common Words by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Count"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+## Emotion in Songs
+
+
+```{r,echo=FALSE,message=FALSE}
+lyrics_sentiment_fearless <- get_nrc_sentiment((tokens_fearless$word))
+sentimentscores <- data.frame(colSums(lyrics_sentiment_fearless[,]))   
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment" = rownames(sentimentscores), sentimentscores)
+
+
+sentimentscores %>%
+  hchart(
+  'bar', hcaes(x = sentiment, y = Score), name = "Score",color = "#f6ed95")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Emotion and Sentiment")) %>%
+  hc_yAxis(
+    title = list(text = "Score"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+
+## Most Important Words
+
+```{r,echo=FALSE,message=FALSE}
+tswift_tf_idf <- tokens_fearless %>%
+  count(song, word, sort = TRUE) %>%
+  bind_tf_idf(word, song, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(song) %>%
+  top_n(5) %>%
+  ungroup
+
+tswift_tf_idf = tswift_tf_idf %>% 
+  arrange(desc(tf_idf))
+
+
+
+tswift_tf_idf = tswift_tf_idf[-c(6:84), ]
+
+tswift_tf_idf %>% 
+  hchart(
+    'bar', hcaes(x = word, y = round(tf_idf,2)), name = "tf-idf",color = "#f6ed95")  %>% 
+  # hc_title(text = "Songs with the Lowest Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "tf-idf"))  %>%
+  hc_caption(text = "td-idf measures the most important words in the text.") %>% 
+  hc_add_theme(hc_theme_elementary())
+
+```
+
+
+
+
+## Topic Analysis 
+
+```{r,echo=FALSE,message=FALSE, results = 'hide'}
+data_topic <- tokens_fearless %>%
+  count(song, word, sort = TRUE) %>%
+  cast_dfm(song, word, n)
+
+model = stm(data_topic, K = 13, verbose = FALSE, init.type = "Spectral")
+
+summary(model)
+
+```
+
+
+The topic analysis reflects songs on the album. 
+
+Topic 1 is Breathe, Topic 2 is Forever & Always, Topic 3 is You're Not Sorry, Topic 4 is Fearless, Topic 5 is You Belong With Me, Topic 6 is Hey Stephen, Topic 7 is Change, Topic 8 is Tell Me Why, Topic 9 is White Horse, Topic 10 is The Way I Loved You, Topic 11 is Fifteen, Topic 12 is Love Story, and Topic 13 is The Best Day.
+
+
+```{r,echo=FALSE,message=FALSE,fig.align = 'center'}
+td_beta <- tidy(model)
+
+td_beta %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  ungroup() %>%
+  mutate(#topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_viridis_d() +
+  #scale_fill_manual(values=c("#983c7f", "#583462", "#be5786", "#b970a5", "#e1b5ca")) +
+  labs(x = NULL, y = expression(beta),
+       title = "Words in Each Topic")
+
+```
+
+
+# {.unlisted .unnumbered}
+
+
+# Speak Now {.tabset .tabset-fade .tabset-pills}
+
+
+
+
+
+
+## Top 10 Words
+
+
+```{r,echo=FALSE,message=FALSE}
+top_10_sn = tokens_speak_now %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(n = 10) 
+
+
+top_10_sn %>%
+  hchart(
+  'bar', hcaes(x = word, y = n), name = "Word Count",color = "#942f91")  %>% 
+  #hc_title(text = "Top 10 Words in Speak Now") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Counts"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+## Sentiment of Songs
+
+
+```{r,echo=FALSE,message=FALSE,results='hide'}
+sentiment_afinn_sn = tokens_speak_now %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  group_by(song) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  ungroup() %>% 
+  mutate(method = "afinn")
+
+sentiment_bing_sn = tokens_speak_now %>% 
+  inner_join(tidytext::get_sentiments("bing"), 
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "bing")
+
+sentiment_nrc_sn = tokens_speak_now %>% 
+  inner_join(tidytext::get_sentiments("nrc") %>% 
+               filter(sentiment %in% c("positive", 
+                                        "negative")),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+sentiment_nrc_2_sn = tokens_speak_now %>% 
+  inner_join(tidytext::get_sentiments("nrc"),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+data_sentiment_sn = bind_rows(sentiment_afinn_sn,
+                           sentiment_bing_sn,
+                           sentiment_nrc_sn) %>% 
+  left_join(speak_now, by = "song")
+```
+
+
+```{r,echo=FALSE,message=FALSE}
+sentiment_bing_sn_2 = 
+  sentiment_bing_sn %>% 
+  arrange(desc(sentiment))
+
+
+sentiment_bing_sn_2 %>%
+  hchart(
+  'bar', hcaes(x = song, y = sentiment), name = "Sentiment",color = "#942f91")  %>% 
+ # hc_title(text = "Speak Now Songs by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Song")) %>%
+  hc_yAxis(
+    title = list(text = "Sentiment"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+## Most Common Word by Sentiment 
+
+
+```{r,echo=FALSE,message=FALSE}
+tokens_speak_now %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  dplyr::rename(sentiment = value) %>% 
+  count(word, sentiment) %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, 
+            n = 1) %>%
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  hchart(
+  'bar', hcaes(x = word, y = n, group = sentiment), tooltip = list(pointFormat = "Count: {point.n} and Sentiment: {point.sentiment}"),pointWidth = 15) %>%  
+ hc_colors(c("#3a2964", "#305274", "#267b84","#409c7d", "#7fb55f", "#bece42", "#fde725" )) %>% 
+ # hc_title(text = "Most Common Words by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Count"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+## Emotion in Songs
+
+
+```{r,echo=FALSE,message=FALSE}
+lyrics_sentiment_fearless <- get_nrc_sentiment((tokens_speak_now$word))
+sentimentscores <- data.frame(colSums(lyrics_sentiment_fearless[,]))   
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment" = rownames(sentimentscores), sentimentscores)
+
+
+sentimentscores %>%
+  hchart(
+  'bar', hcaes(x = sentiment, y = Score), name = "Score",color = "#942f91")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Emotion and Sentiment")) %>%
+  hc_yAxis(
+    title = list(text = "Score"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+
+
+## Most Important Words
+
+```{r,echo=FALSE,message=FALSE}
+tswift_tf_idf <- tokens_speak_now %>%
+  count(song, word, sort = TRUE) %>%
+  bind_tf_idf(word, song, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(song) %>%
+  top_n(5) %>%
+  ungroup
+
+tswift_tf_idf = tswift_tf_idf %>% 
+arrange(desc(tf_idf))
+
+
+tswift_tf_idf = tswift_tf_idf[-c(6:113), ]
+
+tswift_tf_idf %>% 
+  hchart(
+    'bar', hcaes(x = word, y = round(tf_idf,2)), name = "tf-idf",color = "#942f91")  %>% 
+  # hc_title(text = "Songs with the Lowest Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "tf-idf"))  %>%
+  hc_caption(text = "td-idf measures the most important words in the text.") %>% 
+  hc_add_theme(hc_theme_elementary())
+
+
+```
+
+
+
+
+
+## Topic Analysis 
+
+```{r,echo=FALSE,message=FALSE, results = 'hide'}
+data_topic <- tokens_speak_now %>%
+  count(song, word, sort = TRUE) %>%
+  cast_dfm(song, word, n)
+
+model = stm(data_topic, K = 14, verbose = FALSE, init.type = "Spectral")
+
+summary(model)
+
+```
+
+
+
+The topic analysis reflects songs on the album. 
+
+Topic 1 is Never Grow Up, Topic 2 is Haunted, Topic is 3 Mean, Topic 4 is The Story of Us, Topic 5 is Enchanted, Topic 6 is Sparks Fly, Topic 7 is Mine, Topic 8 is Back to December, Topic 9 is Better Than Revenge, Topic 10 is Innocent, Topic 11 is Speak Now, Topic 12 is Last Kiss, Topic 13 is Long Live, and Topic 14 is Dear John. 
+
+
+```{r,echo=FALSE,message=FALSE,fig.align = 'center'}
+
+td_beta <- tidy(model)
+
+td_beta %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  ungroup() %>%
+  dplyr::filter(term != "playground" & term != "mattress" & term != "applause" & term != "actress") %>% 
+  mutate(#topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_viridis_d() +
+  #scale_fill_manual(values=c("#983c7f", "#583462", "#be5786", "#b970a5", "#e1b5ca")) +
+  labs(x = NULL, y = expression(beta),
+       title = "Words in Each Topic")
+
+```
+
+
+# {.unlisted .unnumbered}
+
+
+
+# Red {.tabset .tabset-fade .tabset-pills}
+
+
+
+
+
+
+
+## Top 10 Words
+
+```{r,echo=FALSE,message=FALSE}
+top_10_red = tokens_red %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(n = 10) %>% 
+  filter(word != "night")
+
+
+top_10_red %>%
+  hchart(
+  'bar', hcaes(x = word, y = n), name = "Word Count",color = "#a02b48")  %>% 
+ # hc_title(text = "Top 10 Words in Red") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Counts"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+## Sentiment of Songs
+
+```{r,echo=FALSE,message=FALSE,results='hide'}
+sentiment_afinn_red = tokens_red %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  group_by(song) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  ungroup() %>% 
+  mutate(method = "afinn")
+
+sentiment_bing_red = tokens_red %>% 
+  inner_join(tidytext::get_sentiments("bing"), 
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "bing")
+
+sentiment_nrc_red = tokens_red %>% 
+  inner_join(tidytext::get_sentiments("nrc") %>% 
+               filter(sentiment %in% c("positive", 
+                                        "negative")),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+sentiment_nrc_2_red = tokens_red %>% 
+  inner_join(tidytext::get_sentiments("nrc"),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+data_sentiment_red = bind_rows(sentiment_afinn_red,
+                           sentiment_bing_red,
+                           sentiment_nrc_red) %>% 
+  left_join(red, by = "song")
+```
+
+
+
+```{r,echo=FALSE,message=FALSE}
+sentiment_bing_red_2 = 
+  sentiment_bing_red %>% 
+  arrange(desc(sentiment))
+
+
+sentiment_bing_red_2 %>%
+  hchart(
+  'bar', hcaes(x = song, y = sentiment), name = "Sentiment",color = "#a02b48")  %>% 
+  #hc_title(text = "Red Songs by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Song")) %>%
+  hc_yAxis(
+    title = list(text = "Sentiment"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+## Most Common Word by Sentiment
+
+
+```{r,echo=FALSE,message=FALSE}
+tokens_red %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  dplyr::rename(sentiment = value) %>% 
+  count(word, sentiment) %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, 
+            n = 1) %>%
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  hchart(
+  'bar', hcaes(x = word, y = n, group = sentiment), tooltip = list(pointFormat = "Count: {point.n} and Sentiment: {point.sentiment}"),pointWidth = 15) %>%  
+ hc_colors(c("#3a2964", "#305274", "#267b84","#409c7d", "#7fb55f", "#bece42", "#fde725" )) %>% 
+  #hc_title(text = "Most Common Words by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Count"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+## Emotion in Songs
+
+
+```{r,echo=FALSE,message=FALSE}
+lyrics_sentiment_fearless <- get_nrc_sentiment((tokens_red$word))
+sentimentscores <- data.frame(colSums(lyrics_sentiment_fearless[,]))   
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment" = rownames(sentimentscores), sentimentscores)
+
+
+sentimentscores %>%
+  hchart(
+  'bar', hcaes(x = sentiment, y = Score), name = "Score",color = "#a02b48")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Emotion and Sentiment")) %>%
+  hc_yAxis(
+    title = list(text = "Score"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+
+
+## Most Important Words
+
+```{r,echo=FALSE,message=FALSE}
+#tf_idf for Red
+
+tswift_tf_idf <- tokens_red %>%
+  count(song, word, sort = TRUE) %>%
+  bind_tf_idf(word, song, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(song) %>%
+  top_n(5) %>%
+  ungroup
+
+tswift_tf_idf = tswift_tf_idf %>% 
+  arrange(desc(tf_idf))
+
+
+tswift_tf_idf = tswift_tf_idf[-c(6:123), ]
+
+tswift_tf_idf %>% 
+  hchart(
+    'bar', hcaes(x = word, y = round(tf_idf,2)), name = "tf-idf",color = "#a02b48")  %>% 
+  # hc_title(text = "Songs with the Lowest Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "tf-idf"))  %>%
+  hc_caption(text = "td-idf measures the most important words in the text.") %>% 
+  hc_add_theme(hc_theme_elementary())
+
+```
+
+
+
+
+
+## Topic Analysis 
+
+```{r,echo=FALSE,message=FALSE, results = 'hide'}
+data_topic <- tokens_red %>%
+  count(song, word, sort = TRUE) %>%
+  cast_dfm(song, word, n)
+
+model = stm(data_topic, K = 19, verbose = FALSE, init.type = "Spectral")
+
+summary(model)
+
+```
+
+
+The topic analysis reflects songs on the album. 
+
+Topic 1 is Stay Stay Stay, Topic 2 is I Knew You Were Trouble, Topic 3 is Red, Topic 4 is The Last Time, Topic 5 is Girl at Home, Topic 6 is We Are Never Ever Getting Back Together, Topic 7 is Starlight, Topic 8 is Sad Beautiful Tragic, Topic 9 is The Lucky One, Topic 10 is Treacherous, Topic 11 is 22, Topic 12 is I Almost Do, Topic 13 is Everything Has Changed, Topic 14 is Holy Ground, Topic 15 is Come Back... Be Here, Topic 16 is The Moment I Knew, Topic 17 is Begin Again, Topic 18 is State of Grace, and Topic 19 is All Too Well. 
+
+
+
+```{r,echo=FALSE,message=FALSE,fig.align = 'center'}
+
+td_beta <- tidy(model)
+
+td_beta %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  ungroup() %>%
+  dplyr::filter(term != "hair") %>% 
+  mutate(#topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_viridis_d() +
+  #scale_fill_manual(values=c("#983c7f", "#583462", "#be5786", "#b970a5", "#e1b5ca")) +
+  labs(x = NULL, y = expression(beta),
+       title = "Words in Each Topic")
+
+```
+
+# {.unlisted .unnumbered}
+
+
+# 1989 {.tabset .tabset-fade .tabset-pills}
+
+
+
+
+
+
+
+
+## Top 10 Words
+
+```{r,echo=FALSE,message=FALSE}
+top_10_1989 = tokens_1989 %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(n = 10) 
+
+
+top_10_1989 %>%
+  hchart(
+  'bar', hcaes(x = word, y = n), name = "Word Count",color = "#b0b0df")  %>% 
+ # hc_title(text = "Top 10 Words in 1989") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Counts"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+
+## Sentiment of Songs 
+
+
+```{r,echo=FALSE,message=FALSE,results='hide'}
+sentiment_afinn_1989 = tokens_1989 %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  group_by(song) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  ungroup() %>% 
+  mutate(method = "afinn")
+
+sentiment_bing_1989 = tokens_1989 %>% 
+  inner_join(tidytext::get_sentiments("bing"), 
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "bing")
+
+sentiment_nrc_1989 = tokens_1989 %>% 
+  inner_join(tidytext::get_sentiments("nrc") %>% 
+               filter(sentiment %in% c("positive", 
+                                        "negative")),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+sentiment_nrc_2_1989 = tokens_1989 %>% 
+  inner_join(tidytext::get_sentiments("nrc"),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+data_sentiment_1989 = bind_rows(sentiment_afinn_1989,
+                           sentiment_bing_1989,
+                           sentiment_nrc_1989) %>% 
+  left_join(ts_1989, by = "song")
+```
+
+
+
+
+```{r,echo=FALSE,message=FALSE}
+sentiment_bing_1989_2 = 
+  sentiment_bing_1989 %>% 
+  arrange(desc(sentiment))
+
+
+sentiment_bing_1989_2 %>%
+  hchart(
+  'bar', hcaes(x = song, y = sentiment), name = "Sentiment",color = "#b0b0df")  %>% 
+  #hc_title(text = "1989 Songs by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Song")) %>%
+  hc_yAxis(
+    title = list(text = "Sentiment"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+## Most Common Word by Sentiment 
+
+
+
+```{r,echo=FALSE,message=FALSE}
+tokens_1989 %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  dplyr::rename(sentiment = value) %>% 
+  count(word, sentiment) %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, 
+            n = 1) %>%
+  filter(word != "hell") %>%
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  hchart(
+  'bar', hcaes(x = word, y = n, group = sentiment), tooltip = list(pointFormat = "Count: {point.n} and Sentiment: {point.sentiment}"),pointWidth = 15) %>%  
+ hc_colors(c("#440154", "#3a2964", "#305274", "#267b84","#409c7d", "#7fb55f", "#bece42", "#fde725" )) %>% 
+ # hc_title(text = "Most Common Words by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Count"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+## Emotion in Songs
+
+
+```{r,echo=FALSE,message=FALSE}
+lyrics_sentiment_fearless <- get_nrc_sentiment((tokens_1989$word))
+sentimentscores <- data.frame(colSums(lyrics_sentiment_fearless[,]))   
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment" = rownames(sentimentscores), sentimentscores)
+
+
+sentimentscores %>%
+  hchart(
+  'bar', hcaes(x = sentiment, y = Score), name = "Score",color = "#b0b0df")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Emotion and Sentiment")) %>%
+  hc_yAxis(
+    title = list(text = "Score"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+
+
+## Most Important Words
+
+```{r,echo=FALSE,message=FALSE}
+#tf_idf for 1989
+
+tswift_tf_idf <- tokens_1989 %>%
+  count(song, word, sort = TRUE) %>%
+  bind_tf_idf(word, song, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(song) %>%
+  top_n(5) %>%
+  ungroup
+
+tswift_tf_idf = tswift_tf_idf %>% 
+  arrange(desc(tf_idf))
+
+
+tswift_tf_idf = tswift_tf_idf[-c(6:89), ]
+
+
+tswift_tf_idf %>% 
+  hchart(
+    'bar', hcaes(x = word, y = round(tf_idf,2)), name = "tf-idf",color = "#b0b0df")  %>% 
+  # hc_title(text = "Songs with the Lowest Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "tf-idf"))  %>%
+  hc_caption(text = "td-idf measures the most important words in the text.") %>% 
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+
+## Topic Analysis 
+
+
+```{r,echo=FALSE,message=FALSE, results = 'hide'}
+data_topic <- tokens_1989 %>%
+  count(song, word, sort = TRUE) %>%
+  cast_dfm(song, word, n)
+
+model = stm(data_topic, K = 13, verbose = FALSE, init.type = "Spectral")
+
+summary(model)
+
+```
+
+
+The topic analysis reflects songs on the album. 
+
+Topic 1 is All You Had To Do Was Stay, Topic 2 is This Love, Topic 3 is Shake It Off, Topic 4 is Out of the Woods, Topic 5 is How You Get the Girl, Topic 6 is Welcome to New York, Topic 7 is Bad Blood, Topic 8 is Clean, Topic 9 is Style, Topic 10 is I Wish You Would, Topic 11 is Wildest Dreams, Topic 12 is I Know Places, and Topic 13 is Blank Space. 
+
+```{r,echo=FALSE,message=FALSE,fig.align = 'center'}
+td_beta <- tidy(model)
+
+td_beta %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  ungroup() %>%
+  dplyr::filter(term != "discovered" & term != "decided" & term != "december" & term != "foxex" & term != "found" & term != "chasing") %>% 
+  mutate(#topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_viridis_d() +
+  #scale_fill_manual(values=c("#983c7f", "#583462", "#be5786", "#b970a5", "#e1b5ca")) +
+  labs(x = NULL, y = expression(beta),
+       title = "Words in Each Topic")
+
+```
+
+# {.unlisted .unnumbered}
+
+
+# Reputation {.tabset .tabset-fade .tabset-pills}
+
+
+
+## Top 10 Words
+
+
+```{r,echo=FALSE,message=FALSE}
+top_10_rep = tokens_reputation %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(n = 10) 
+
+
+top_10_rep %>%
+  hchart(
+  'bar', hcaes(x = word, y = n), name = "Word Count",color = "#676767")  %>% 
+ # hc_title(text = "Top 10 Words in Repuation") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Counts"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+## Sentiment of Songs
+
+```{r,echo=FALSE,message=FALSE,results='hide'}
+sentiment_afinn_rep = tokens_reputation %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  group_by(song) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  ungroup() %>% 
+  mutate(method = "afinn")
+
+sentiment_bing_rep = tokens_reputation %>% 
+  inner_join(tidytext::get_sentiments("bing"), 
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "bing")
+
+sentiment_nrc_rep = tokens_reputation %>% 
+  inner_join(tidytext::get_sentiments("nrc") %>% 
+               filter(sentiment %in% c("positive", 
+                                        "negative")),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+sentiment_nrc_2_rep = tokens_reputation %>% 
+  inner_join(tidytext::get_sentiments("nrc"),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+data_sentiment_rep = bind_rows(sentiment_afinn_rep,
+                           sentiment_bing_rep,
+                           sentiment_nrc_rep) %>% 
+  left_join(reputation, by = "song")
+```
+
+
+
+
+
+```{r,echo=FALSE,message=FALSE}
+sentiment_bing_rep_2 = 
+  sentiment_bing_rep %>% 
+  arrange(desc(sentiment))
+
+
+sentiment_bing_rep_2 %>%
+  hchart(
+  'bar', hcaes(x = song, y = sentiment), name = "Sentiment",color = "#676767")  %>% 
+#  hc_title(text = "Reputation Songs by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Song")) %>%
+  hc_yAxis(
+    title = list(text = "Sentiment"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+## Most Common Word by Sentiment
+
+
+```{r,echo=FALSE,message=FALSE}
+tokens_reputation %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  dplyr::rename(sentiment = value) %>% 
+  count(word, sentiment) %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, 
+            n = 1) %>%
+  filter(word != "damn") %>% 
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  hchart(
+  'bar', hcaes(x = word, y = n, group = sentiment), tooltip = list(pointFormat = "Count: {point.n} and Sentiment: {point.sentiment}"),pointWidth = 15) %>%  
+ hc_colors(c("#3a2964", "#305274", "#267b84","#409c7d", "#7fb55f", "#bece42", "#fde725" )) %>% 
+ # hc_title(text = "Most Common Words by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Count"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+## Emotion in Songs
+
+```{r,echo=FALSE,message=FALSE}
+lyrics_sentiment_fearless <- get_nrc_sentiment((tokens_reputation$word))
+sentimentscores <- data.frame(colSums(lyrics_sentiment_fearless[,]))   
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment" = rownames(sentimentscores), sentimentscores)
+
+
+sentimentscores %>%
+  hchart(
+  'bar', hcaes(x = sentiment, y = Score), name = "Score",color = "#676767")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Emotion and Sentiment")) %>%
+  hc_yAxis(
+    title = list(text = "Score"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+## Most Important Words
+
+
+
+```{r,echo=FALSE,message=FALSE}
+#tf_idf for Reputation
+
+tswift_tf_idf <- tokens_reputation %>%
+  count(song, word, sort = TRUE) %>%
+  bind_tf_idf(word, song, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(song) %>%
+  top_n(5) %>%
+  ungroup
+
+
+tswift_tf_idf = tswift_tf_idf %>% 
+  arrange(desc(tf_idf))
+
+
+tswift_tf_idf = tswift_tf_idf[-c(6:92), ]
+
+
+
+tswift_tf_idf %>% 
+  hchart(
+    'bar', hcaes(x = word, y = round(tf_idf,2)), name = "tf-idf",color = "#676767")  %>% 
+  # hc_title(text = "Songs with the Lowest Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "tf-idf"))  %>%
+  hc_caption(text = "td-idf measures the most important words in the text.") %>% 
+  hc_add_theme(hc_theme_elementary())
+
+```
+
+
+
+
+
+
+## Topic Analysis 
+
+```{r,echo=FALSE,message=FALSE, results = 'hide'}
+data_topic <- tokens_reputation %>%
+  count(song, word, sort = TRUE) %>%
+  cast_dfm(song, word, n)
+
+model = stm(data_topic, K = 15, verbose = FALSE, init.type = "Spectral")
+
+summary(model)
+
+```
+
+
+
+The topic analysis reflects songs on the album. 
+
+Topic 1 is Call It What You Want, Topic 2 is I Did Something Bad, Topic 3 is Dancing With Our Hands Tied, Topic 4 is Delicate, Topic 5 is New Year's Day, Topic 6 is Gorgeous, Topic 7 is Getaway Car, Topic 8 is ...Ready For It?, Topic 9 is King of My Heart, Topic 10 is Don't Blame Me, Topic 11 is This is Why We Can't Have Nice Things, Topic 12 is Dress, Topic 13 is So It Goes..., Topic 14 is Endgame, and Topic 15 is Look What You Made Me Do. 
+
+
+
+```{r,echo=FALSE,message=FALSE,fig.align = 'center'}
+td_beta <- tidy(model)
+
+td_beta %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  ungroup() %>%
+  dplyr::filter(term != "usin" & term != "doin" & term != "ridin" & term != "begin") %>% 
+  mutate(#topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_viridis_d() +
+  #scale_fill_manual(values=c("#983c7f", "#583462", "#be5786", "#b970a5", "#e1b5ca")) +
+  labs(x = NULL, y = expression(beta),
+       title = "Words in Each Topic")
+
+```
+
+# {.unlisted .unnumbered}
+
+
+# Lover {.tabset .tabset-fade .tabset-pills}
+
+
+
+
+
+
+
+## Top 10 Words 
+
+
+```{r,echo=FALSE,message=FALSE}
+top_10_lover = tokens_lover %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(n = 10) %>% 
+  dplyr::filter(word != "darling")
+
+
+top_10_lover %>%
+  hchart(
+  'bar', hcaes(x = word, y = n), name = "Word Count",color = "#feaac4")  %>% 
+ # hc_title(text = "Top 10 Words in Lover") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Counts"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+
+## Sentiment of Songs
+
+
+```{r,echo=FALSE,message=FALSE,results='hide'}
+sentiment_afinn_lover = tokens_lover %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  group_by(song) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  ungroup() %>% 
+  mutate(method = "afinn")
+
+sentiment_bing_lover = tokens_lover %>% 
+  inner_join(tidytext::get_sentiments("bing"), 
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "bing")
+
+sentiment_nrc_lover = tokens_lover %>% 
+  inner_join(tidytext::get_sentiments("nrc") %>% 
+               filter(sentiment %in% c("positive", 
+                                        "negative")),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+sentiment_nrc_2_lover = tokens_lover %>% 
+  inner_join(tidytext::get_sentiments("nrc"),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+data_sentiment_lover = bind_rows(sentiment_afinn_lover,
+                           sentiment_bing_lover,
+                           sentiment_nrc_lover) %>% 
+  left_join(lover, by = "song")
+```
+
+
+```{r,echo=FALSE,message=FALSE}
+sentiment_bing_lover_2 = 
+  sentiment_bing_lover %>% 
+  arrange(desc(sentiment))
+
+
+sentiment_bing_lover_2 %>%
+  hchart(
+  'bar', hcaes(x = song, y = sentiment), name = "Sentiment",color = "#feaac4")  %>% 
+ # hc_title(text = "Lover Songs by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Song")) %>%
+  hc_yAxis(
+    title = list(text = "Sentiment"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+## Most Common Word by Sentiment
+
+
+```{r,echo=FALSE,message=FALSE}
+tokens_lover %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  dplyr::rename(sentiment = value) %>% 
+  count(word, sentiment) %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, 
+            n = 1) %>%
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  hchart(
+  'bar', hcaes(x = word, y = n, group = sentiment), tooltip = list(pointFormat = "Count: {point.n} and Sentiment: {point.sentiment}"),pointWidth = 15) %>%  
+ hc_colors(c( "#3a2964", "#305274", "#267b84","#409c7d", "#7fb55f", "#bece42", "#fde725" )) %>% 
+ # hc_title(text = "Most Common Words by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Count"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+
+## Emotion in Songs
+
+```{r,echo=FALSE,message=FALSE}
+lyrics_sentiment_fearless <- get_nrc_sentiment((tokens_lover$word))
+sentimentscores <- data.frame(colSums(lyrics_sentiment_fearless[,]))   
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment" = rownames(sentimentscores), sentimentscores)
+
+
+sentimentscores %>%
+  hchart(
+  'bar', hcaes(x = sentiment, y = Score), name = "Score",color = "#feaac4")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Emotion and Sentiment")) %>%
+  hc_yAxis(
+    title = list(text = "Score"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+## Most Important Words
+
+
+
+```{r,echo=FALSE,message=FALSE}
+#tf_idf for lover
+
+tswift_tf_idf <- tokens_lover %>%
+  count(song, word, sort = TRUE) %>%
+  bind_tf_idf(word, song, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(song) %>%
+  top_n(5) %>%
+  ungroup
+
+tswift_tf_idf = tswift_tf_idf %>% 
+  arrange(desc(tf_idf))
+
+
+tswift_tf_idf = tswift_tf_idf[-c(6:147), ]
+
+
+
+tswift_tf_idf %>% 
+  hchart(
+    'bar', hcaes(x = word, y = round(tf_idf,2)), name = "tf-idf",color = "#feaac4")  %>% 
+  # hc_title(text = "Songs with the Lowest Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "tf-idf"))  %>%
+  hc_caption(text = "td-idf measures the most important words in the text.") %>% 
+  hc_add_theme(hc_theme_elementary())
+
+
+```
+
+
+
+
+
+## Topic Analysis 
+
+```{r,echo=FALSE,message=FALSE, results = 'hide'}
+data_topic <- tokens_lover %>%
+  count(song, word, sort = TRUE) %>%
+  cast_dfm(song, word, n)
+
+model = stm(data_topic, K = 18, verbose = FALSE, init.type = "Spectral")
+
+summary(model)
+
+```
+
+
+The topic analysis reflects songs on the album. 
+
+Topic 1 is Daylight, Topic 2 is Me!, Topic 3 is I Think He Knows, Topic 4 is Cornelia Street, Topic 5 is False God, Topic 6 is The Archer, Topic 7 is The Man, Topic 8 is It's Nice to Have a Friend, Topic 9 is Lover, Topic 10 is Afterglow, Topic 11 is I Forgot That You Existed, Topic 12 is You Need to Calm Down, Topic 13 is Soon You'll Get Better, Topic 14 is Death by a Thousand Cuts, Topic 15 is Paper Rings, Topic 16 is London Boy, Topic 17 is Cruel Summer, and Topic 18 is Miss Americana and the Heartbreak Prince. 
+
+
+
+```{r,echo=FALSE,message=FALSE,fig.align = 'center'}
+td_beta <- tidy(model)
+
+td_beta %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  ungroup() %>%
+  dplyr::filter(term != "burned" & term != "break" & term != "afterglow") %>% 
+  mutate(#topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_viridis_d() +
+  #scale_fill_manual(values=c("#983c7f", "#583462", "#be5786", "#b970a5", "#e1b5ca")) +
+  labs(x = NULL, y = expression(beta),
+       title = "Words in Each Topic")
+
+```
+
+# {.unlisted .unnumbered}
+
+
+# Folklore {.tabset .tabset-fade .tabset-pills}
+
+
+
+
+
+
+
+## Top 10 Words
+
+```{r,echo=FALSE,message=FALSE}
+top_10_folk = tokens_folklore %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(n = 10) 
+
+
+top_10_folk %>%
+  hchart(
+  'bar', hcaes(x = word, y = n), name = "Word Count",color = "#444444")  %>% 
+ # hc_title(text = "Top 10 Words in Folklore") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Counts"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+## Sentiment of Songs 
+
+
+
+```{r,echo=FALSE,message=FALSE,results='hide'}
+sentiment_afinn_folk = tokens_folklore %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  group_by(song) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  ungroup() %>% 
+  mutate(method = "afinn")
+
+sentiment_bing_folk = tokens_folklore %>% 
+  inner_join(tidytext::get_sentiments("bing"), 
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "bing")
+
+sentiment_nrc_folk = tokens_folklore %>% 
+  inner_join(tidytext::get_sentiments("nrc") %>% 
+               filter(sentiment %in% c("positive", 
+                                        "negative")),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+sentiment_nrc_2_folk = tokens_folklore %>% 
+  inner_join(tidytext::get_sentiments("nrc"),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+data_sentiment_folk = bind_rows(sentiment_afinn_folk,
+                           sentiment_bing_folk,
+                           sentiment_nrc_folk) %>% 
+  left_join(folklore, by = "song")
+```
+
+
+
+```{r,echo=FALSE,message=FALSE}
+sentiment_bing_folk_2 = 
+  sentiment_bing_folk %>% 
+  arrange(desc(sentiment))
+
+
+sentiment_bing_folk_2 %>%
+  hchart(
+  'bar', hcaes(x = song, y = sentiment), name = "Sentiment",color = "#444444")  %>% 
+#  hc_title(text = "Folklore Songs by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Song")) %>%
+  hc_yAxis(
+    title = list(text = "Sentiment"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+## Most Common Word by Sentiment 
+
+
+
+```{r,echo=FALSE,message=FALSE}
+tokens_folklore %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  dplyr::rename(sentiment = value) %>% 
+  count(word, sentiment) %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, 
+            n = 1) %>%
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  hchart(
+  'bar', hcaes(x = word, y = n, group = sentiment), tooltip = list(pointFormat = "Count: {point.n} and Sentiment: {point.sentiment}"),pointWidth = 15) %>%  
+ hc_colors(c("#3a2964", "#305274", "#267b84","#409c7d", "#7fb55f", "#bece42", "#fde725" )) %>% 
+ # hc_title(text = "Most Common Words by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Count"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+## Emotion in Songs
+
+```{r,echo=FALSE,message=FALSE}
+lyrics_sentiment_fearless <- get_nrc_sentiment((tokens_folklore$word))
+sentimentscores <- data.frame(colSums(lyrics_sentiment_fearless[,]))   
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment" = rownames(sentimentscores), sentimentscores)
+
+
+sentimentscores %>%
+  hchart(
+  'bar', hcaes(x = sentiment, y = Score), name = "Score",color = "#444444")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Emotion and Sentiment")) %>%
+  hc_yAxis(
+    title = list(text = "Score"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+
+## Most Important Words
+
+
+```{r,echo=FALSE,message=FALSE}
+#tf_idf for Folklore
+
+tswift_tf_idf <- tokens_folklore %>%
+  count(song, word, sort = TRUE) %>%
+  bind_tf_idf(word, song, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(song) %>%
+  top_n(5) %>%
+  ungroup
+
+tswift_tf_idf = tswift_tf_idf %>% 
+  arrange(desc(tf_idf))
+
+
+tswift_tf_idf = tswift_tf_idf[-c(6:126), ]
+
+
+tswift_tf_idf %>% 
+  hchart(
+    'bar', hcaes(x = word, y = round(tf_idf,2)), name = "tf-idf",color = "#444444")  %>% 
+  # hc_title(text = "Songs with the Lowest Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "tf-idf"))  %>%
+  hc_caption(text = "td-idf measures the most important words in the text.") %>% 
+  hc_add_theme(hc_theme_elementary())
+
+```
+
+
+
+
+
+
+## Topic Analysis 
+
+```{r,echo=FALSE,message=FALSE, results = 'hide'}
+data_topic <- tokens_folklore %>%
+  count(song, word, sort = TRUE) %>%
+  cast_dfm(song, word, n)
+
+model = stm(data_topic, K = 16, verbose = FALSE, init.type = "Spectral")
+
+summary(model)
+
+```
+
+
+
+
+The topic analysis reflects songs on the album. 
+
+Topic 1 is Epiphany, Topic 2 is August, Topic 3 is Mad Woman, Topic 4 is Mirror Ball, Topic 5 is Exile, Topic 6 is Seven, Topic 7 is This is Me Trying, Topic 8 is Peace, Topic 9 is The 1, Topic 10 is Illicit Affairs, Topic 11 is Hoax, Topic 12 is My Tears Ricochet, Topic 13 is Betty, Topic 14 is The Last Great American Dynasty, Topic 15 is Cardigan, and Topic 16 is Invisible String. 
+
+
+
+```{r,echo=FALSE,message=FALSE,fig.align = 'center'}
+td_beta <- tidy(model)
+
+td_beta %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  ungroup() %>%
+  dplyr::filter(term != "mirrorball" & term != "hush") %>% 
+  mutate(#topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_viridis_d() +
+  #scale_fill_manual(values=c("#983c7f", "#583462", "#be5786", "#b970a5", "#e1b5ca")) +
+  labs(x = NULL, y = expression(beta),
+       title = "Words in Each Topic")
+
+```
+
+# {.unlisted .unnumbered}
+
+
+# Evermore {.tabset .tabset-fade .tabset-pills}
+
+
+
+
+
+
+
+## Top 10 Words
+
+
+```{r,echo=FALSE,message=FALSE}
+top_10_evermore = tokens_evermore %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(n = 10) %>% 
+  filter(word != "head")
+
+
+top_10_evermore %>%
+  hchart(
+  'bar', hcaes(x = word, y = n), name = "Word Count",color = "#c27251")  %>% 
+ # hc_title(text = "Top 10 Words in Evermore") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Counts"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+## Sentiment of Songs
+
+
+```{r,echo=FALSE,message=FALSE,results='hide'}
+sentiment_afinn_ever = tokens_evermore %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  group_by(song) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  ungroup() %>% 
+  mutate(method = "afinn")
+
+sentiment_bing_ever = tokens_evermore %>% 
+  inner_join(tidytext::get_sentiments("bing"), 
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "bing")
+
+sentiment_nrc_ever = tokens_evermore %>% 
+  inner_join(tidytext::get_sentiments("nrc") %>% 
+               filter(sentiment %in% c("positive", 
+                                        "negative")),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+sentiment_nrc_2_ever = tokens_evermore %>% 
+  inner_join(tidytext::get_sentiments("nrc"),
+             by = "word") %>% 
+  count(song, sentiment) %>% 
+  pivot_wider(names_from = sentiment, 
+              values_from = n) %>% 
+  mutate(positive = as.numeric(positive), 
+         positive = case_when(is.na(positive) == TRUE ~ 0, 
+                              is.na(positive) == FALSE ~ positive), 
+        negative =  as.numeric(negative),
+        negative = case_when(is.na(negative) == TRUE ~ 0, 
+                              is.na(negative) == FALSE ~ negative), 
+        sentiment = positive - negative) %>% 
+  mutate(method = "nrc")
+
+data_sentiment_ever = bind_rows(sentiment_afinn_ever,
+                           sentiment_bing_ever,
+                           sentiment_nrc_ever) %>% 
+  left_join(evermore, by = "song")
+```
+
+
+```{r,echo=FALSE,message=FALSE}
+sentiment_bing_ever_2 = 
+  sentiment_bing_ever %>% 
+  arrange(desc(sentiment))
+
+
+sentiment_bing_ever_2 %>%
+  hchart(
+  'bar', hcaes(x = song, y = sentiment), name = "Sentiment",color = "#c27251")  %>% 
+ # hc_title(text = "Evermore Songs by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Song")) %>%
+  hc_yAxis(
+    title = list(text = "Sentiment"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+## Most Common Word by Sentiment
+```{r,echo=FALSE,message=FALSE}
+tokens_evermore %>% 
+  inner_join(tidytext::get_sentiments("afinn"), 
+             by = "word") %>% 
+  dplyr::rename(sentiment = value) %>% 
+  count(word, sentiment) %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, 
+            n = 1) %>%
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  hchart(
+  'bar', hcaes(x = word, y = n, group = sentiment), tooltip = list(pointFormat = "Count: {point.n} and Sentiment: {point.sentiment}"),pointWidth = 15) %>%  
+ hc_colors(c("#3a2964", "#305274", "#267b84","#409c7d", "#7fb55f", "#bece42", "#fde725" )) %>% 
+ # hc_title(text = "Most Common Words by Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "Count"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+## Emotion in Songs
+
+```{r,echo=FALSE,message=FALSE}
+lyrics_sentiment_fearless <- get_nrc_sentiment((tokens_evermore$word))
+sentimentscores <- data.frame(colSums(lyrics_sentiment_fearless[,]))   
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment" = rownames(sentimentscores), sentimentscores)
+
+
+sentimentscores %>%
+  hchart(
+  'bar', hcaes(x = sentiment, y = Score), name = "Score",color = "#c27251")  %>% 
+ # hc_title(text = "Top 10 Words in Fearless") %>%
+  hc_xAxis(
+    title = list(text = "Emotion and Sentiment")) %>%
+  hc_yAxis(
+    title = list(text = "Score"))  %>%
+  hc_add_theme(hc_theme_elementary())
+```
+
+
+
+
+## Most Important Words
+
+
+```{r,echo=FALSE,message=FALSE}
+#tf_idf for evermore
+
+tswift_tf_idf <- tokens_evermore %>%
+  count(song, word, sort = TRUE) %>%
+  bind_tf_idf(word, song, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(song) %>%
+  top_n(5) %>%
+  ungroup
+
+tswift_tf_idf = tswift_tf_idf %>% 
+  arrange(desc(tf_idf))
+
+
+tswift_tf_idf = tswift_tf_idf[-c(6:133), ]
+
+
+tswift_tf_idf %>% 
+  hchart(
+    'bar', hcaes(x = word, y = round(tf_idf,2)), name = "tf-idf",color = "#c27251")  %>% 
+  # hc_title(text = "Songs with the Lowest Sentiment") %>%
+  hc_xAxis(
+    title = list(text = "Word")) %>%
+  hc_yAxis(
+    title = list(text = "tf-idf"))  %>%
+  hc_caption(text = "td-idf measures the most important words in the text.") %>% 
+  hc_add_theme(hc_theme_elementary())
+
+```
+
+
+
+
+
+## Topic Analysis 
+
+```{r,echo=FALSE,message=FALSE, results = 'hide'}
+data_topic <- tokens_evermore %>%
+  count(song, word, sort = TRUE) %>%
+  cast_dfm(song, word, n)
+
+model = stm(data_topic, K = 15, verbose = FALSE, init.type = "Spectral")
+
+summary(model)
+
+```
+
+
+The topic analysis reflects songs on the album. 
+
+Topic 1 is Closure, Topic 2 is Marjorie, Topic 3 is Dorothea, Topic 4 is Willow, Topic 5 is No Body, No Crime, Topic 6 is Cowboy Like Me, Topic 7 is Happiness, Topic 8 is Evermore, Topic 9 is 'Tis the Season, Topic 10 is Tolerate It, Topic 11 is Long Story Short, Topic 12 is Ivy, Topic 13 is Gold Rush, Topic 14 is Champagne Problems, and Topic 15 is Coney Island. 
+
+```{r,echo=FALSE,message=FALSE,fig.align = 'center'}
+td_beta <- tidy(model)
+
+td_beta %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  ungroup() %>%
+  dplyr::filter(term != "eves" & term != "sellin" & term != "late" & term != "brighter" & term != "goddamn" & term != "putting" & term != "grows" & term != "dreamland") %>% 
+  mutate(#topic = paste0("Topic ", topic),
+         term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_viridis_d() +
+  #scale_fill_manual(values=c("#983c7f", "#583462", "#be5786", "#b970a5", "#e1b5ca")) +
+  labs(x = NULL, y = expression(beta),
+       title = "Words in Each Topic")
+
+```
+
+
+
+
+
+
+
+
